@@ -11,6 +11,8 @@
 
 class UCapsuleComponent;					// 캡슐 컴포넌트 전방선언
 class USkeletalMeshComponent;				// 스켈레톤 메시 전방선언
+class USpringArmComponent;					// 스프링암 컴포넌트 전방선언
+class UCameraComponent;						// 카메라 컴포넌트
 
 UCLASS()
 class TEST2_API ABird : public APawn
@@ -27,6 +29,9 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	void MoveForward(float Value);
+	void Turn(float Value);
+	void LookUp(float Value);
 
 private:
 	UPROPERTY(VisibleAnywhere)
@@ -34,4 +39,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	USkeletalMeshComponent* BirdMesh;
+
+	UPROPERTY(VisibleAnywhere)
+	USpringArmComponent* CameraBoom;
+
+	UPROPERTY(VisibleAnywhere)
+	UCameraComponent* ViewCamera;
 };
