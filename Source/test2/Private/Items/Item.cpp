@@ -21,7 +21,7 @@
 //		언리얼 엔진에서는 팩토리 함수를 많이 사용하기 때문에 new를 직접 사용하지 않는다
 
 // Sets default values
-AItem::AItem() : RunningTime(0.f), Amplitude(0.25f), TimeConstant(5.f)
+AItem::AItem() : Amplitude(0.25f), TimeConstant(5.f), RunningTime(0.f)
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;

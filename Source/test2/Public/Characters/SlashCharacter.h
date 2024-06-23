@@ -8,6 +8,7 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class UGroomComponent;
 
 UCLASS()
 class TEST2_API ASlashCharacter : public ACharacter
@@ -35,4 +36,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	USpringArmComponent* SpringArm;
+
+	UPROPERTY(EditAnywhere, Category = "Hair")
+	UGroomComponent* Hair;
+
+	UPROPERTY(EditAnywhere, Category = "Hair")
+	UGroomComponent* Eyebrows;
 };

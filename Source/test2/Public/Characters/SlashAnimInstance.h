@@ -19,6 +19,7 @@ class TEST2_API USlashAnimInstance : public UAnimInstance
 	
 
 public:
+	USlashAnimInstance();
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaTime);
 
