@@ -12,3 +12,5 @@ Content/NorwayMaple/Textures/Trunk/Trunk_03/T_NorwayMaple_Trunk_03_Mask.uasset f
 Content/NorwayMaple/Textures/Trunk/Trunk_04/T_NorwayMaple_Trunk_04_Normal.uasset filter=lfs diff=lfs merge=lfs -text
 Content/NorwayMaple/Textures/Trunk/Trunk_04/T_NorwayMaple_Trunk_04_Mask.uasset filter=lfs diff=lfs merge=lfs -text
 Content/NorwayMaple/Textures/Decoration/T_NorwayMaple_Decoration_Normal.uasset filter=lfs diff=lfs merge=lfs -text
+Content/EchoContent/Characters/Echo/Textures/Head/T_Head_highpass_S.uasset filter=lfs diff=lfs merge=lfs -text
+Content/MedievalDungeon/Textures/T_*.uasset filter=lfs diff=lfs merge=lfs -text
