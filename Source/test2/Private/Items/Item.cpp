@@ -2,6 +2,7 @@
 
 
 #include "Items/Item.h"
+#include "Components/SphereComponent.h"
 #include "test2/DebugMacro.h"
 
 //Class Default Object (CDO) : 언리얼 엔진 리플렉션 시스템에 의해 생성되는 객체의 복사본,
@@ -28,6 +29,9 @@ AItem::AItem() : Amplitude(0.25f), TimeConstant(5.f), RunningTime(0.f)
 
 	ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMeshComponent"));	//디폴트 하위객체 생성 팩토리 함수
 	RootComponent = ItemMesh;
+
+	Sphere = CreateDefaultSubobject<USphereComponent>(TEXT("Sphere"));
+	Sphere->SetupAttachment(GetRootComponent());
 }
 
 // Called when the game starts or when spawned
@@ -35,16 +39,18 @@ void AItem::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UE_LOG(LogTemp, Warning, TEXT("Begin Play Called!"));
+#pragma region 디버그 로그 띄우기, 온스크린 디버그 메세지 띄우기
 
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(0, 60.f, FColor::Cyan, FString("Item OnScreen Message!"));
-	}
+	//UE_LOG(LogTemp, Warning, TEXT("Begin Play Called!"));
 
-	UWorld* World = GetWorld();
-	FVector Location = GetActorLocation();
-	FVector Forward = GetActorForwardVector();
+	//if (GEngine)
+	//{
+	//	GEngine->AddOnScreenDebugMessage(0, 60.f, FColor::Cyan, FString("Item OnScreen Message!"));
+	//}
+
+	//UWorld* World = GetWorld();
+	//FVector Location = GetActorLocation();
+	//FVector Forward = GetActorForwardVector();
 
 	//if (World)
 	//{
@@ -72,6 +78,11 @@ void AItem::BeginPlay()
 
 	//float AvgFloat = Avg<float>(3.45f, 7.86f);
 	//UE_LOG(LogTemp, Warning, TEXT("Avg of 3.45 and 7.86: %f"), AvgFloat);
+
+#pragma endregion 
+
+	Sphere->OnComponentBeginOverlap.AddDynamic(this, &AItem::OnSphereOverlap);	// 콜백 함수를 델리게이트에 연결하는 매크로, 인텔리센스에서 자동완성되지 않으므로 주의
+	Sphere->OnComponentEndOverlap.AddDynamic(this, &AItem::OnSphereEndOverlap);	// 이벤트 이름.AddDynamic(this, 연결할 콜백 함수 이름) 식으로 작성
 }
 
 float AItem::TransformedSin(float Value)
@@ -84,21 +95,41 @@ float AItem::TransformedCos(float Value)
 	return Amplitude * FMath::Cos(Value * TimeConstant);
 }
 
+void AItem::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	const FString OtherActorName = OtherActor->GetName();
+	
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(1, 30.f, FColor::Red, OtherActorName);
+	}
+}
+
+void AItem::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	const FString OtherActorName = FString("Ending Overlap with: ") + OtherActor->GetName();	// FString은 + 연산 지원
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(1, 30.f, FColor::Red, OtherActorName);
+	}
+}
+
 // Called every frame
 void AItem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (GEngine)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("DeltaTime: %f"), DeltaTime);
+	//if (GEngine)
+	//{
+	//	UE_LOG(LogTemp, Warning, TEXT("DeltaTime: %f"), DeltaTime);
 
-		FString Name = GetName();
-		FString Message = FString::Printf(TEXT("Item Name: %s"), *Name);
-		GEngine->AddOnScreenDebugMessage(1, 60.f, FColor::Cyan, Message);
+	//	FString Name = GetName();
+	//	FString Message = FString::Printf(TEXT("Item Name: %s"), *Name);
+	//	GEngine->AddOnScreenDebugMessage(1, 60.f, FColor::Cyan, Message);
 
-		UE_LOG(LogTemp, Warning, TEXT("Item Name: %s"), *Name);
-	}
+	//	UE_LOG(LogTemp, Warning, TEXT("Item Name: %s"), *Name);
+	//}
 
 	RunningTime += DeltaTime;
 	//float DeltaZ = Amplitude * FMath::Sin(RunningTime * TimeConstant);

@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "Item.generated.h"
 
+class USphereComponent;
+
 UCLASS()
 class TEST2_API AItem : public AActor
 {
@@ -37,6 +39,19 @@ protected:
 	template<typename T>
 	T Avg(T First, T Second);
 
+	UFUNCTION()	// UFUNCTION을 붙여야 제대로 델리게이트가 작동함
+				// OnSphereOverlap은 Sphere를 가지고 충돌을 검사하는데, 이 Sphere를 포함한 원시적인 도형 컴포넌트들이 사용할 수 있는 PrimitiveComponent.h에서 
+				// 이벤트들의 이름이 들어간 델리게이트 매크로를 찾아볼 수 있다. 이 중 우리가 사용하고 싶은 OnComponentBeginOverlap 이벤트를 가진 델리게이트를 확인하고
+				// 이벤트 이름 옆에 있는 매개변수의 타입 이름들과 변수 이름들을 참고하여 우리가 사용할 함수(OnSphereOverlap)의 매개변수를 만든다.
+				// OnComponentBeginOverlap은 6개의 매개변수가 필요한 델리게이트로, 정해진 6개의 매개변수를 우리 함수에 적용한다.
+				// 이후 BeginPlay에서 AddDynamic 매크로를 이용하여 우리가 만든 콜백 함수를 델리게이트에 연결한다.
+	void OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()	// OnSphereEndOverlap은 함수가 더 이상 오버랩되지 않는 순간에 적용되는 이벤트이며, 이 이벤트는 PrimitiveComponent.h에서
+				// 매개변수 4개를 쓰는 델리게이트 매크로에 연결되어 있다. 따라서 해당 매크로에 적혀있는 매개변수 타입들과 이름들을 참고하여 함수를 작성하고
+				// 이후 BeginPlay에서 AddDynamic 매크로를 이용하여 우리가 만든 콜백 함수를 델리게이트에 연결한다.
+	void OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -64,6 +79,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	UStaticMeshComponent* ItemMesh;
+
+	UPROPERTY(VisibleAnywhere)
+	USphereComponent* Sphere;	// 충돌(오버랩)을 검출할 때 사용할 구체 컴포넌트
 };
 
 template<typename T>
