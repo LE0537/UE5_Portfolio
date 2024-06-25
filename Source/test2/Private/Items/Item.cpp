@@ -3,6 +3,7 @@
 
 #include "Items/Item.h"
 #include "Components/SphereComponent.h"
+#include "Characters/SlashCharacter.h"
 #include "test2/DebugMacro.h"
 
 //Class Default Object (CDO) : 언리얼 엔진 리플렉션 시스템에 의해 생성되는 객체의 복사본,
@@ -39,7 +40,7 @@ void AItem::BeginPlay()
 {
 	Super::BeginPlay();
 
-#pragma region 디버그 로그 띄우기, 온스크린 디버그 메세지 띄우기
+#pragma region Debug Logs
 
 	//UE_LOG(LogTemp, Warning, TEXT("Begin Play Called!"));
 
@@ -97,12 +98,20 @@ float AItem::TransformedCos(float Value)
 
 void AItem::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	const FString OtherActorName = OtherActor->GetName();
-	
-	if (GEngine)
+
+	ASlashCharacter* SlashCharacter = Cast<ASlashCharacter>(OtherActor);
+
+	if (SlashCharacter)
 	{
-		GEngine->AddOnScreenDebugMessage(1, 30.f, FColor::Red, OtherActorName);
+		SlashCharacter->SetOverlappingItem(this);	// 플레이어 캐릭터가 충돌하면 플레이어에 있는 아이템 포인터가 이 아이템을 가리키도록 설정
 	}
+
+	//const FString OtherActorName = OtherActor->GetName();
+
+	//if (GEngine)
+	//{
+	//	GEngine->AddOnScreenDebugMessage(1, 30.f, FColor::Red, OtherActorName);
+	//}
 }
 
 void AItem::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)

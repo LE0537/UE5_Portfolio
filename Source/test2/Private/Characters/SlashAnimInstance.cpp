@@ -6,7 +6,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 
-USlashAnimInstance::USlashAnimInstance() : SlashCharacter(nullptr), SlashCharacterMovement(nullptr), GroundSpeed(0.f), IsFalling(false)
+USlashAnimInstance::USlashAnimInstance() : SlashCharacter(nullptr), SlashCharacterMovement(nullptr), GroundSpeed(0.f), IsFalling(false), CharacterState(ECharacterState::ECS_Unequipped)
 {
 
 }
@@ -32,5 +32,6 @@ void USlashAnimInstance::NativeUpdateAnimation(float DeltaTime)	// 애니메이션 틱
 		FVector Velocity = SlashCharacterMovement->Velocity;
 		GroundSpeed = UKismetMathLibrary::VSizeXY(Velocity);
 		IsFalling = SlashCharacterMovement->IsFalling();	// Movement 컴포넌트에 내장되어있는 함수, 캐릭터가 공중에 있는지 아닌지를 판별
+		CharacterState = SlashCharacter->GetCharacterState();
 	}
 }

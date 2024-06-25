@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
+#include "CharacterTypes.h"
 #include "SlashAnimInstance.generated.h"
 
 /**
@@ -34,4 +35,7 @@ public:
 	
 	UPROPERTY(BlueprintReadOnly, Category = Movement)
 	bool IsFalling;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Movement | Character State")	// | 를 이용해서 블루프린트에서 볼 수 있는 서브카테고리를 만들 수 있음
+	ECharacterState CharacterState;
 };
