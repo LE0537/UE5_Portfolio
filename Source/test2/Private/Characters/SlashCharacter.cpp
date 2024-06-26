@@ -99,23 +99,23 @@ void ASlashCharacter::EKeyPressed()
 {
 	AWeapon* OverlappingWeapon = Cast<AWeapon>(OverlappingItem);
 
-	if (OverlappingWeapon)
+	if (OverlappingWeapon)	// 1. 월드에 놓여 있는 무기의 콜리전 구체와 플레이어가 겹쳤을 경우
 	{
 		OverlappingWeapon->Equip(GetMesh(), FName(TEXT("RightHandSocket")));
 		CharacterState = ECharacterState::ECS_EquippedOneHandedWeapon;
-		OverlappingItem = nullptr;
-		EquippedWeapon = OverlappingWeapon;
+		OverlappingItem = nullptr;	// 무기를 장착한 후 플레이어가 더 이상 무기와 겹치지 않는다는 처리를 하기 위해 nullptr 처리
+		EquippedWeapon = OverlappingWeapon;	// 장착한 무기는 EquippedWeapon으로 가리키는 포인터를 변경
 	}
-	else
+	else	// 콜리전 구체와 상호작용하지 않고 있을 때 E를 누를 경우
 	{
-		if (CanDisarm())
+		if (CanDisarm())	// 무기를 집어넣음
 		{
 			PlayEquipMontage(FName(TEXT("Unequip")));
 			CharacterState = ECharacterState::ECS_Unequipped;
 			ActionState = EActionState::EAS_EquippingWeapon;
 		}
 
-		else if (CanArm())
+		else if (CanArm())	// 무기를 꺼냄
 		{
 			PlayEquipMontage(FName(TEXT("Equip")));
 			CharacterState = ECharacterState::ECS_EquippedOneHandedWeapon;
@@ -126,9 +126,9 @@ void ASlashCharacter::EKeyPressed()
 
 void ASlashCharacter::Attack()
 {
-	if(CanAttack())
+	if(CanAttack())	
 	{
-		PlayAttackMontage();
+		PlayAttackMontage();	// 공격 애니메이션 몽타주 재생
 		ActionState = EActionState::EAS_Attacking;
 	}
 }
@@ -138,10 +138,12 @@ void ASlashCharacter::PlayAttackMontage()
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && AttackMontage)
 	{
-		AnimInstance->Montage_Play(AttackMontage);	//몽타주 재생 함수
-		//예시(강의 연습)
+		AnimInstance->Montage_Play(AttackMontage);	// 몽타주 재생 함수
+		// 예시(강의 연습)
 		const int32 Selection = FMath::RandRange(0, 2);
 		FName SectionName = FName();
+
+		// 실제 게임 프로그래밍 시에는 enum 값으로 순차적으로 공격 애니메이션이 재생되도록 설정할것임
 
 		switch (Selection)	// 선택된 공격 인덱스에 따라 섹션 네임 설정
 		{
@@ -158,11 +160,11 @@ void ASlashCharacter::PlayAttackMontage()
 			break;
 		}
 
-		AnimInstance->Montage_JumpToSection(SectionName, AttackMontage);	//선택된 섹션 네임으로 몽타주 이동
+		AnimInstance->Montage_JumpToSection(SectionName, AttackMontage);	//선택된 섹션 네임으로 몽타주의 재생 시점 이동
 	}
 }
 
-void ASlashCharacter::AttackEnd()
+void ASlashCharacter::AttackEnd()	// 공격이 끝나는 시점에 플레이어의 ActionState를 EAS_Unoccupied로 다시 되돌리는 콜백 함수
 {
 	ActionState = EActionState::EAS_Unoccupied;
 }
@@ -178,8 +180,8 @@ void ASlashCharacter::PlayEquipMontage(FName SectionName)
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && EquipMontage)
 	{
-		AnimInstance->Montage_Play(EquipMontage);
-		AnimInstance->Montage_JumpToSection(SectionName, EquipMontage);
+		AnimInstance->Montage_Play(EquipMontage);	// 장착 애니메이션 몽타주 재생
+		AnimInstance->Montage_JumpToSection(SectionName, EquipMontage);	// 선택된 섹션 네임으로 몽타주의 재생 시점 이동
 	}
 }
 

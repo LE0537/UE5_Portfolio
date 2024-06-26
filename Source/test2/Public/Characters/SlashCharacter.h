@@ -33,23 +33,23 @@ protected:
 	void Attack();
 
 	// 몽타주 재생 함수들
-	void PlayAttackMontage();
+	void PlayAttackMontage();	// 무기 공격 몽타주 재생 함수
 	UFUNCTION(BlueprintCallable)
-	void AttackEnd();
+	void AttackEnd();	// 공격이 끝나는 시점에 플레이어의 ActionState를 EAS_Unoccupied로 다시 되돌리는 콜백 함수
 	bool CanAttack();
 
-	void PlayEquipMontage(FName SectionName);
+	void PlayEquipMontage(FName SectionName);	// 무기 집어넣기/꺼내기 몽타주 재생 함수
 	bool CanDisarm();
 	bool CanArm();
 
 	UFUNCTION(BlueprintCallable)
-	void Disarm();
+	void Disarm();	// 무기 집어넣기 함수
 
 	UFUNCTION(BlueprintCallable)
-	void Arm();
+	void Arm();		// 무기 꺼내기 함수
 
 	UFUNCTION(BlueprintCallable)
-	void FinishEquipping();
+	void FinishEquipping();	// 무기 집어넣기/꺼내기가 끝나는 시점에 플레이어의 ActionState를 EAS_Unoccupied로 다시 되돌리는 콜백 함수
 
 public:	
 	virtual void Tick(float DeltaTime) override;

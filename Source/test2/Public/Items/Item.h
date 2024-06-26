@@ -8,10 +8,10 @@
 
 class USphereComponent;
 
-enum class EItemState : uint8	// 물체가 둥둥 떠다니는 이펙트를 할지 말지를 나타내는 enum class
+enum class EItemState : uint8	// 물체가 둥둥 떠다니는 처리를 할지 말지를 나타내는 enum class
 {
-	EIS_Hovering,
-	EIS_Equipped
+	EIS_Hovering,	// 아이템이 떠다님
+	EIS_Equipped	// 플레이어가 아이템을 장착한 상태라 떠다니지 않음
 };
 
 UCLASS()

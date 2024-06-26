@@ -8,7 +8,7 @@
 
 void AWeapon::Equip(USceneComponent* InParent, FName InSocketName)
 {
-	AttachMeshToSocket(InParent, InSocketName);
+	AttachMeshToSocket(InParent, InSocketName);		// 지정한 메시의 지정한 소켓에 해당 메시를 붙이는 함수
 	ItemState = EItemState::EIS_Equipped;
 	if (EquipSound)
 	{
@@ -21,7 +21,7 @@ void AWeapon::Equip(USceneComponent* InParent, FName InSocketName)
 
 	if (Sphere)
 	{
-		Sphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Sphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);	// 장착 후 아이템의 콜리전 구체를 꺼서 콜리전 구체와 플레이어 간 상호작용이 일어나지 않도록 함
 	}
 }
 
