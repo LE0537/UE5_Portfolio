@@ -8,6 +8,12 @@
 
 class USphereComponent;
 
+enum class EItemState : uint8	// 물체가 둥둥 떠다니는 처리를 할지 말지를 나타내는 enum class
+{
+	EIS_Hovering,	// 아이템이 떠다님
+	EIS_Equipped	// 플레이어가 아이템을 장착한 상태라 떠다니지 않음
+};
+
 UCLASS()
 class TEST2_API AItem : public AActor
 {
@@ -55,6 +61,11 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UStaticMeshComponent* ItemMesh;
 
+	EItemState ItemState;
+
+	UPROPERTY(VisibleAnywhere)
+	USphereComponent* Sphere;	// 충돌(오버랩)을 검출할 때 사용할 구체 컴포넌트
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -79,9 +90,6 @@ private:
 
 	//UPROPERTY(EditAnywhere);
 	//float TimeConstant;
-
-	UPROPERTY(VisibleAnywhere)
-	USphereComponent* Sphere;	// 충돌(오버랩)을 검출할 때 사용할 구체 컴포넌트
 };
 
 template<typename T>

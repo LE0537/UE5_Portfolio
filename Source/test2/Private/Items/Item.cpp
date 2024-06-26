@@ -23,7 +23,7 @@
 //		언리얼 엔진에서는 팩토리 함수를 많이 사용하기 때문에 new를 직접 사용하지 않는다
 
 // Sets default values
-AItem::AItem() : Amplitude(0.25f), TimeConstant(5.f), RunningTime(0.f)
+AItem::AItem() : Amplitude(0.25f), TimeConstant(5.f), RunningTime(0.f), ItemState(EItemState::EIS_Hovering)
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -154,7 +154,9 @@ void AItem::Tick(float DeltaTime)
 
 	//FRotator AvgRotator = Avg<FRotator>(GetActorRotation(), FRotator::ZeroRotator);	//ERROR, FRotator에는 나누기 연산이 없음
 
-
-
+	if (ItemState == EItemState::EIS_Hovering)
+	{
+		AddActorWorldOffset(FVector(0.f, 0.f, TransformedSin(RunningTime)));
+	}
 }
 
