@@ -8,8 +8,9 @@
 #include "GroomComponent.h"
 #include "Items/Item.h"
 #include "Items/Weapon/Weapon.h"
+#include "Animation/AnimMontage.h"
 
-ASlashCharacter::ASlashCharacter() : CharacterState(ECharacterState::ECS_Unequipped)
+ASlashCharacter::ASlashCharacter() : CharacterState(ECharacterState::ECS_Unequipped), ActionState(EActionState::EAS_Unoccupied)
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -46,6 +47,11 @@ void ASlashCharacter::BeginPlay()
 
 void ASlashCharacter::MoveForward(float Value)
 {
+	if (ActionState != EActionState::EAS_Unoccupied)
+	{
+		return;
+	}
+
 	if (Controller && Value != 0.f)
 	{
 		//FVector Forward = GetActorForwardVector();
@@ -61,6 +67,11 @@ void ASlashCharacter::MoveForward(float Value)
 
 void ASlashCharacter::MoveRight(float Value)
 {
+	if (ActionState != EActionState::EAS_Unoccupied)
+	{
+		return;
+	}
+
 	if (Controller && Value != 0.f)
 	{
 		//FVector Right = GetActorRightVector();
@@ -92,7 +103,118 @@ void ASlashCharacter::EKeyPressed()
 	{
 		OverlappingWeapon->Equip(GetMesh(), FName(TEXT("RightHandSocket")));
 		CharacterState = ECharacterState::ECS_EquippedOneHandedWeapon;
+		OverlappingItem = nullptr;
+		EquippedWeapon = OverlappingWeapon;
 	}
+	else
+	{
+		if (CanDisarm())
+		{
+			PlayEquipMontage(FName(TEXT("Unequip")));
+			CharacterState = ECharacterState::ECS_Unequipped;
+			ActionState = EActionState::EAS_EquippingWeapon;
+		}
+
+		else if (CanArm())
+		{
+			PlayEquipMontage(FName(TEXT("Equip")));
+			CharacterState = ECharacterState::ECS_EquippedOneHandedWeapon;
+			ActionState = EActionState::EAS_EquippingWeapon;
+		}
+	}
+}
+
+void ASlashCharacter::Attack()
+{
+	if(CanAttack())
+	{
+		PlayAttackMontage();
+		ActionState = EActionState::EAS_Attacking;
+	}
+}
+
+void ASlashCharacter::PlayAttackMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && AttackMontage)
+	{
+		AnimInstance->Montage_Play(AttackMontage);	//몽타주 재생 함수
+		//예시(강의 연습)
+		const int32 Selection = FMath::RandRange(0, 2);
+		FName SectionName = FName();
+
+		switch (Selection)	// 선택된 공격 인덱스에 따라 섹션 네임 설정
+		{
+		case 0:
+			SectionName = FName(TEXT("Attack1"));
+			break;
+		case 1:
+			SectionName = FName(TEXT("Attack2"));
+			break;
+		case 2:
+			SectionName = FName(TEXT("Attack3"));
+			break;
+		default:
+			break;
+		}
+
+		AnimInstance->Montage_JumpToSection(SectionName, AttackMontage);	//선택된 섹션 네임으로 몽타주 이동
+	}
+}
+
+void ASlashCharacter::AttackEnd()
+{
+	ActionState = EActionState::EAS_Unoccupied;
+}
+
+bool ASlashCharacter::CanAttack()
+{
+	return ActionState == EActionState::EAS_Unoccupied &&
+		CharacterState != ECharacterState::ECS_Unequipped;
+}
+
+void ASlashCharacter::PlayEquipMontage(FName SectionName)
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && EquipMontage)
+	{
+		AnimInstance->Montage_Play(EquipMontage);
+		AnimInstance->Montage_JumpToSection(SectionName, EquipMontage);
+	}
+}
+
+bool ASlashCharacter::CanDisarm()
+{
+	return CharacterState != ECharacterState::ECS_Unequipped &&
+		ActionState == EActionState::EAS_Unoccupied;
+}
+
+bool ASlashCharacter::CanArm()
+{
+	return ActionState == EActionState::EAS_Unoccupied &&
+		CharacterState == ECharacterState::ECS_Unequipped &&
+		EquippedWeapon;
+}
+
+void ASlashCharacter::Disarm()
+{
+	if (EquippedWeapon)
+	{
+		EquippedWeapon->AttachMeshToSocket(GetMesh(), FName(TEXT("SpineSocket")));
+	}
+}
+
+void ASlashCharacter::Arm()
+{
+	if (EquippedWeapon)
+	{
+		EquippedWeapon->AttachMeshToSocket(GetMesh(), FName(TEXT("RightHandSocket")));
+	}
+}
+
+void ASlashCharacter::FinishEquipping()
+{
+	ActionState = EActionState::EAS_Unoccupied;
 }
 
 // Called every frame
@@ -100,6 +222,11 @@ void ASlashCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (GEngine)
+	{
+		FString message = FString::Printf(TEXT("ActionState: %d"), ActionState) ;
+		GEngine->AddOnScreenDebugMessage(1, 60.f, FColor::Red, message);
+	}
 }
 
 void ASlashCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -114,5 +241,6 @@ void ASlashCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	// 액션 매핑 함수, IE_Pressed는 눌렀을 때 작동된다는 뜻
 	PlayerInputComponent->BindAction(FName(TEXT("Jump")), IE_Pressed, this, &ACharacter::Jump);	
 	PlayerInputComponent->BindAction(FName(TEXT("Equip")), IE_Pressed, this, &ASlashCharacter::EKeyPressed);
+	PlayerInputComponent->BindAction(FName(TEXT("Attack")), IE_Pressed, this, &ASlashCharacter::Attack);
 }
 
