@@ -38,7 +38,7 @@ protected:
 	void AttackEnd();	// 공격이 끝나는 시점에 플레이어의 ActionState를 EAS_Unoccupied로 다시 되돌리는 콜백 함수
 	bool CanAttack();
 
-	void PlayEquipMontage(FName SectionName);	// 무기 집어넣기/꺼내기 몽타주 재생 함수
+	void PlayEquipMontage(const FName& SectionName);	// 무기 집어넣기/꺼내기 몽타주 재생 함수
 	bool CanDisarm();
 	bool CanArm();
 
@@ -55,6 +55,8 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	UFUNCTION(BlueprintCallable)
+	void SetWeaponCollisionEnabled(ECollisionEnabled::Type CollisionEnabled);	// enum값을 매개변수로 넘기려면 이렇게 넘겨야 함
 
 private:
 	UPROPERTY(VisibleAnywhere)
