@@ -5,6 +5,7 @@
 #include "Components/SphereComponent.h"
 #include "Characters/SlashCharacter.h"
 #include "test2/DebugMacro.h"
+#include "NiagaraComponent.h"
 
 //Class Default Object (CDO) : 언리얼 엔진 리플렉션 시스템에 의해 생성되는 객체의 복사본,
 // 엔진이 시작될 때나 컴파일 시 생성됨, 리플렉션 시스템이 우리 클래스에 기반한 블루프린트 객체들을 초기화할 때 필요한 값들을 보관하기 위해 생성됨
@@ -28,11 +29,15 @@ AItem::AItem() : Amplitude(0.25f), TimeConstant(5.f), RunningTime(0.f), ItemStat
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMeshComponent"));	//디폴트 하위객체 생성 팩토리 함수
+	ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMeshComponent"));	// 디폴트 하위객체 생성 팩토리 함수
 	RootComponent = ItemMesh;
 
 	Sphere = CreateDefaultSubobject<USphereComponent>(TEXT("Sphere"));
 	Sphere->SetupAttachment(GetRootComponent());
+
+	EmbersEffect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("EmbersEffect"));	// 나이아가라 시스템 
+	EmbersEffect->SetupAttachment(GetRootComponent());
+
 }
 
 // Called when the game starts or when spawned
