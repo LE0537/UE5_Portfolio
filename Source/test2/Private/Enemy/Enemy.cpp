@@ -7,9 +7,12 @@
 #include "DebugMacro.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/AttributeComponent.h"
+#include "HUD/HealthBarComponent.h"
+#include "Characters/CharacterTypes.h"
 
 // Sets default values
-AEnemy::AEnemy()
+AEnemy::AEnemy() : CombatTarget(nullptr), CombatRadius(500.f)
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -19,13 +22,18 @@ AEnemy::AEnemy()
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
 	GetMesh()->SetGenerateOverlapEvents(true);
+
+	Attributes = CreateDefaultSubobject<UAttributeComponent>(TEXT("Attributes"));
+	HealthBarWidget = CreateDefaultSubobject<UHealthBarComponent>(TEXT("HealthBar"));
+	HealthBarWidget->SetupAttachment(GetRootComponent());
 }
 
 // Called when the game starts or when spawned
 void AEnemy::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	HealthBarWidget->SetHealthPercent(Attributes->GetHealthPercent());
 }
 
 void AEnemy::PlayHitReactMontage(const FName& SectionName)
@@ -38,11 +46,67 @@ void AEnemy::PlayHitReactMontage(const FName& SectionName)
 	}
 }
 
+void AEnemy::Die()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && DeathMontage)
+	{
+		AnimInstance->Montage_Play(DeathMontage);
+
+		FName SectionName = FName();
+		
+		const int32 Selection = FMath::RandRange(0, 3);
+		switch (Selection)
+		{
+		case 0:
+			SectionName = FName(TEXT("Death1"));
+			DeathPose = EDeathPose::EDP_Death1;
+			break;
+
+		case 1:
+			SectionName = FName(TEXT("Death2"));
+			DeathPose = EDeathPose::EDP_Death2;
+			break;
+
+		case 2:
+			SectionName = FName(TEXT("Death3"));
+			DeathPose = EDeathPose::EDP_Death3;
+			break;
+
+		case 3:
+			SectionName = FName(TEXT("Death4"));
+			DeathPose = EDeathPose::EDP_Death4;
+			break;
+
+		default:
+			break;
+		}
+
+		AnimInstance->Montage_JumpToSection(SectionName, DeathMontage);
+	}
+
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetLifeSpan(3.f);
+	HealthBarWidget->SetVisibility(false);
+}
+
 // Called every frame
 void AEnemy::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (CombatTarget)
+	{
+		const double DistanceToTarget = (CombatTarget->GetActorLocation() - GetActorLocation()).Size();
+		if (DistanceToTarget > CombatRadius)
+		{
+			CombatTarget = nullptr;
+			if (HealthBarWidget)
+			{
+				HealthBarWidget->SetVisibility(false);
+			}
+		}
+	}
 }
 
 // Called to bind functionality to input
@@ -56,7 +120,19 @@ void AEnemy::GetHit_Implementation(const FVector& ImpactPoint)
 {
 	DRAW_SPHERE_2S(ImpactPoint);
 
-	DirectionalHitReact(ImpactPoint);
+	if (HealthBarWidget)
+	{
+		HealthBarWidget->SetVisibility(true);
+	}
+
+	if (Attributes && Attributes->IsAlive())
+	{
+		DirectionalHitReact(ImpactPoint);
+	}
+	else
+	{
+		Die();
+	}
 	
 	// 타격 사운드 재생
 	if (HitSound)
@@ -131,4 +207,34 @@ void AEnemy::DirectionalHitReact(const FVector& ImpactPoint)
 	//// 외적 법선 벡터
 	//UKismetSystemLibrary::DrawDebugArrow(this, GetActorLocation(), GetActorLocation() + CrossProduct * 120.f, 5.f, FColor::Green, 5.f);
 }
+
+float AEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	if (Attributes)
+	{
+		Attributes->ReceiveDamage(DamageAmount);
+
+		if (HealthBarWidget)
+		{
+			HealthBarWidget->SetHealthPercent(Attributes->GetHealthPercent());
+		}
+	}
+
+	CombatTarget = EventInstigator->GetPawn();
+
+	return DamageAmount;
+}
+
+// AActor::TakeDamage
+// float DamageAmount: 대미지 수치
+// FDamageEvent& DamageEvent: 대미지에 관한 추가적인 정보
+// AController* Instigator: 대미지를 입힌 컨트롤러
+// AActor* DamageCauser: 직접적으로 대미지를 입힌 액터
+
+// UGameplayStatics::ApplyDamage
+// DamageTyepClass: 대미지 타입을 정해서 사용자가 커스텀으로 대미지타입에 따른 처리를 할 수 있도록 함
+
+// 만약 플레이어가 적에게 대미지를 입힌다면 UGameplayStatics::ApplyDamage()를 호출하면서 매개변수로 적을 넘김
+// 대미지를 받은 적은 ApplyDamage에서 넘겨받은 정보를 바탕으로 AActor::TakeDamage를 호출하여 대미지에 대한 처리를 함
+
 

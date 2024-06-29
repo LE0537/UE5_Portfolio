@@ -102,7 +102,7 @@ void ASlashCharacter::EKeyPressed()
 
 	if (OverlappingWeapon)	// 1. 월드에 놓여 있는 무기의 콜리전 구체와 플레이어가 겹쳤을 경우
 	{
-		OverlappingWeapon->Equip(GetMesh(), FName(TEXT("RightHandSocket")));
+		OverlappingWeapon->Equip(GetMesh(), FName(TEXT("RightHandSocket")), this, this);
 		CharacterState = ECharacterState::ECS_EquippedOneHandedWeapon;
 		OverlappingItem = nullptr;	// 무기를 장착한 후 플레이어가 더 이상 무기와 겹치지 않는다는 처리를 하기 위해 nullptr 처리
 		EquippedWeapon = OverlappingWeapon;	// 장착한 무기는 EquippedWeapon으로 가리키는 포인터를 변경
@@ -225,11 +225,11 @@ void ASlashCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (GEngine)
-	{
-		FString message = FString::Printf(TEXT("ActionState: %d"), ActionState) ;
-		GEngine->AddOnScreenDebugMessage(1, 60.f, FColor::Red, message);
-	}
+	//if (GEngine)
+	//{
+	//	FString message = FString::Printf(TEXT("ActionState: %d"), ActionState) ;
+	//	GEngine->AddOnScreenDebugMessage(1, 60.f, FColor::Red, message);
+	//}
 }
 
 void ASlashCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

@@ -20,7 +20,7 @@ class TEST2_API AWeapon : public AItem
 
 public:
 	AWeapon();
-	void Equip(USceneComponent* InParent, FName InSocketName);
+	void Equip(USceneComponent* InParent, FName InSocketName, AActor* NewOwner, APawn* NewInstigator);
 	void AttachMeshToSocket(USceneComponent* InParent, const FName& InSocketName);		// 함수 내용물이 복잡해질 때 Ctrl + . 을 누르고 "함수 추출" 기능을 사용하면 이렇게 예쁘게 빼준다
 	
 protected:
@@ -49,6 +49,9 @@ private:
 
 	TArray<AActor*> IgnoreActors;
 
+	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+	float Damage = 40.f;
+	
 public:
 	FORCEINLINE UBoxComponent* GetWeaponBox() const { return WeaponBox; }
 	FORCEINLINE void ClearIgnoreActors() { IgnoreActors.Empty(); }
