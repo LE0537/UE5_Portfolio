@@ -13,6 +13,8 @@ class USoundBase;
 class UParticleSystem;
 class UAttributeComponent;
 class UHealthBarComponent;
+class UPawnSensingComponent;
+class AAIController;
 
 UCLASS()
 class TEST2_API AEnemy : public ACharacter, public IHitInterface
@@ -31,12 +33,25 @@ protected:
 
 	void Die();
 
+	bool InTargetRange(AActor* Target, double Radius);
+
+	void MoveToTarget(AActor* Target);
+
+	AActor* ChoosePatrolTarget();
+
+	UFUNCTION()
+	void PawnSeen(APawn* SeenPawn);
+
 	UPROPERTY(BlueprintReadOnly)
 	EDeathPose DeathPose = EDeathPose::EDP_Alive;
 
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+
+	void CheckPatrolTarget();
+
+	void CheckCombatTarget();
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -48,11 +63,18 @@ public:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 private:
+	/*
+	*	컴포넌트
+	*/
+
 	UPROPERTY(VisibleAnywhere)
 	UAttributeComponent* Attributes;
 
 	UPROPERTY(VisibleAnywhere)
 	UHealthBarComponent* HealthBarWidget;
+
+	UPROPERTY(VisibleAnywhere)
+	UPawnSensingComponent* PawnSensing;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	UAnimMontage* HitReactMontage;
@@ -71,4 +93,33 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	float CombatRadius;
+
+	UPROPERTY(EditAnywhere)
+	float AttackRadius;
+
+	UPROPERTY()
+	AAIController* EnemyController;
+
+	// 현재 순찰 목표
+	UPROPERTY(EditInstanceOnly, Category = "AI Navigation")
+	AActor* PatrolTarget;
+
+	// 순찰 목표 모음
+	UPROPERTY(EditInstanceOnly, Category = "AI Navigation")
+	TArray<AActor*> PatrolTargets;
+
+	UPROPERTY(EditInstanceOnly, Category = "AI Navigation")
+	double PatrolRadius;
+
+	FTimerHandle PatrolTimer;
+
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	float WaitMin = 5.f;
+
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	float WaitMax = 10.f;
+
+	EEnemyState EnemyState;
+
+	void PatrolTimerFinished();
 };
