@@ -44,6 +44,7 @@ void ASlashCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	Tags.Add(FName(TEXT("SlashCharacter")));	// 캐스트를 줄이기 위한 태그 설정, Enemy PawnSeen 참고 
 }
 
 void ASlashCharacter::MoveForward(float Value)
