@@ -1,22 +1,18 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
+// 헤더를 줄이는 것이 컴파일 시간 단축에 도움이 됨
 #include "Enemy/Enemy.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Components/CapsuleComponent.h"
-#include "DebugMacro.h"
-#include "Kismet/KismetSystemLibrary.h"
-#include "Kismet/GameplayStatics.h"
 #include "Components/AttributeComponent.h"
 #include "HUD/HealthBarComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "AIController.h"
-#include "Characters/CharacterTypes.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "Perception/PawnSensingComponent.h"
+#include "Items/Weapon/Weapon.h"
 
 // Sets default values
-AEnemy::AEnemy() : CombatTarget(nullptr), CombatRadius(500.f), PatrolRadius(200.f), EnemyState(EEnemyState::EES_Patrolling), AttackRadius(150.f)
+AEnemy::AEnemy() : CombatTarget(nullptr), CombatRadius(500.f), PatrolRadius(200.f), EnemyState(EEnemyState::EES_Patrolling), AttackRadius(150.f), PatrollingSpeed(125.f), ChasingSpeed(300.f)
 {
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -24,10 +20,8 @@ AEnemy::AEnemy() : CombatTarget(nullptr), CombatRadius(500.f), PatrolRadius(200.
 	GetMesh()->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
-	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
 	GetMesh()->SetGenerateOverlapEvents(true);
 
-	Attributes = CreateDefaultSubobject<UAttributeComponent>(TEXT("Attributes"));
 	HealthBarWidget = CreateDefaultSubobject<UHealthBarComponent>(TEXT("HealthBar"));
 	HealthBarWidget->SetupAttachment(GetRootComponent());
 
@@ -43,78 +37,125 @@ AEnemy::AEnemy() : CombatTarget(nullptr), CombatRadius(500.f), PatrolRadius(200.
 	GetCharacterMovement()->MaxWalkSpeed = 125.f;
 }
 
-// Called when the game starts or when spawned
+void AEnemy::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (IsDead())
+	{
+		return;
+	}
+
+	if (EnemyState > EEnemyState::EES_Patrolling)
+	{
+		CheckCombatTarget();
+	}
+	else
+	{
+		CheckPatrolTarget();
+	}
+}
+
+void AEnemy::Destroyed()
+{
+	if (EquippedWeapon)
+	{
+		EquippedWeapon->Destroy();
+	}
+}
+
+float AEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	HandleDamage(DamageAmount);
+	CombatTarget = EventInstigator->GetPawn();
+	ChaseTarget();
+	return DamageAmount;
+}
+
+void AEnemy::GetHit_Implementation(const FVector& ImpactPoint)
+{
+	ShowHealthBar();
+
+	if (IsAlive())
+	{
+		DirectionalHitReact(ImpactPoint);
+	}
+	else
+	{
+		Die();
+	}
+
+	PlayHitSound(ImpactPoint);
+	SpawnHitParticles(ImpactPoint);
+}
+
 void AEnemy::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (HealthBarWidget)
-	{
-		HealthBarWidget->SetVisibility(false);
-		HealthBarWidget->SetHealthPercent(Attributes->GetHealthPercent());
-	}
-
-	EnemyController = Cast<AAIController>(GetController());
-	MoveToTarget(PatrolTarget);
 
 	if (PawnSensing)
 	{
 		PawnSensing->OnSeePawn.AddDynamic(this, &AEnemy::PawnSeen);
 	}
-}
 
-void AEnemy::PlayHitReactMontage(const FName& SectionName)
-{
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (AnimInstance && HitReactMontage)
-	{
-		AnimInstance->Montage_Play(HitReactMontage);
-		AnimInstance->Montage_JumpToSection(SectionName, HitReactMontage);
-	}
+	InitializeEnemy();
+
+	Tags.Add(FName(TEXT("Enemy")));
 }
 
 void AEnemy::Die()
 {
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (AnimInstance && DeathMontage)
+	EnemyState = EEnemyState::EES_Dead;
+	PlayDeathMontage();
+	ClearAttackTimer();
+	HideHealthBar();
+	DisableCapsule();
+	SetLifeSpan(DeathLifeSpan);
+	GetCharacterMovement()->bOrientRotationToMovement = false;
+}
+
+void AEnemy::Attack()
+{
+	EnemyState = EEnemyState::EES_Engaged;
+	Super::Attack();
+	PlayAttackMontage();
+}
+
+bool AEnemy::CanAttack()
+{
+	bool bCanAttack =
+		IsInAttackRadius() &&
+		!IsAttacking() &&
+		!IsEngaged() &&
+		!IsDead();
+
+	return bCanAttack;
+}
+
+void AEnemy::HandleDamage(float DamageAmount)
+{
+	Super::HandleDamage(DamageAmount);
+
+	if (Attributes && HealthBarWidget)
 	{
-		AnimInstance->Montage_Play(DeathMontage);
-
-		FName SectionName = FName();
-
-		const int32 Selection = FMath::RandRange(0, 3);
-		switch (Selection)
-		{
-		case 0:
-			SectionName = FName(TEXT("Death1"));
-			DeathPose = EDeathPose::EDP_Death1;
-			break;
-
-		case 1:
-			SectionName = FName(TEXT("Death2"));
-			DeathPose = EDeathPose::EDP_Death2;
-			break;
-
-		case 2:
-			SectionName = FName(TEXT("Death3"));
-			DeathPose = EDeathPose::EDP_Death3;
-			break;
-
-		case 3:
-			SectionName = FName(TEXT("Death4"));
-			DeathPose = EDeathPose::EDP_Death4;
-			break;
-
-		default:
-			break;
-		}
-
-		AnimInstance->Montage_JumpToSection(SectionName, DeathMontage);
+		HealthBarWidget->SetHealthPercent(Attributes->GetHealthPercent());
 	}
+}
 
-	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	SetLifeSpan(3.f);
-	HealthBarWidget->SetVisibility(false);
+int32 AEnemy::PlayDeathMontage()
+{
+	const int32 Selection = Super::PlayDeathMontage();
+	TEnumAsByte<EDeathPose> Pose(Selection);	// 정수를 enum으로 변환해주는 템플릿 클래스, enum class에는 사용하는 게 좋지 않음, 따라서 EDeathPose를 그냥 enum으로 바꿔버릴것임
+	if (Pose < EDeathPose::EDP_MAX)
+	{
+		DeathPose = Pose;
+	}
+	return Selection;
+}
+
+void AEnemy::AttackEnd()
+{
+	EnemyState = EEnemyState::EES_NoState;
+	CheckCombatTarget();
 }
 
 bool AEnemy::InTargetRange(AActor* Target, double Radius)
@@ -133,7 +174,7 @@ void AEnemy::MoveToTarget(AActor* Target)
 
 	FAIMoveRequest MoveRequest;
 	MoveRequest.SetGoalActor(Target);
-	MoveRequest.SetAcceptanceRadius(15.f);
+	MoveRequest.SetAcceptanceRadius(50.f);
 
 	EnemyController->MoveTo(MoveRequest);
 }
@@ -159,40 +200,97 @@ AActor* AEnemy::ChoosePatrolTarget()
 	return nullptr;
 }
 
-void AEnemy::PawnSeen(APawn* SeenPawn)
+void AEnemy::StartAttackTimer()
 {
-	if (EnemyState == EEnemyState::EES_Chasing)
-	{
-		return;
-	}
+	EnemyState = EEnemyState::EES_Attacking;
+	const float AttackTime = FMath::RandRange(AttackMin, AttackMax);
+	GetWorldTimerManager().SetTimer(AttackTimer, this, &AEnemy::Attack, AttackTime);
+}
 
-	if (SeenPawn->ActorHasTag(FName(TEXT("SlashCharacter"))))
+void AEnemy::ClearAttackTimer()
+{
+	GetWorldTimerManager().ClearTimer(AttackTimer);
+}
+
+void AEnemy::HideHealthBar()
+{
+	if (HealthBarWidget)
 	{
-		GetWorldTimerManager().ClearTimer(PatrolTimer);	// 추격을 시작하기 때문에 타이머 초기화
-		GetCharacterMovement()->MaxWalkSpeed = 300.f;
-		CombatTarget = SeenPawn;
-		
-		if (EnemyState != EEnemyState::EES_Attacking)
-		{
-			EnemyState = EEnemyState::EES_Chasing;
-			MoveToTarget(CombatTarget);
-		}
+		HealthBarWidget->SetVisibility(false);
 	}
 }
 
-// Called every frame
-void AEnemy::Tick(float DeltaTime)
+void AEnemy::ShowHealthBar()
 {
-	Super::Tick(DeltaTime);
+	if (HealthBarWidget)
+	{
+		HealthBarWidget->SetVisibility(true);
+	}
+}
 
-	if ( EnemyState > EEnemyState::EES_Patrolling )
-	{
-		CheckCombatTarget();
-	}
-	else
-	{
-		CheckPatrolTarget();
-	}
+void AEnemy::LoseInterest()
+{
+	CombatTarget = nullptr;
+	HideHealthBar();
+}
+
+void AEnemy::StartPatrolling()
+{
+	EnemyState = EEnemyState::EES_Patrolling;
+	GetCharacterMovement()->MaxWalkSpeed = 125.f;
+	MoveToTarget(PatrolTarget);
+}
+
+void AEnemy::ChaseTarget()
+{
+	EnemyState = EEnemyState::EES_Chasing;
+	GetCharacterMovement()->MaxWalkSpeed = 300.f;
+	MoveToTarget(CombatTarget);
+}
+
+bool AEnemy::IsOutsideCombatRadius()
+{
+	return !InTargetRange(CombatTarget, CombatRadius);
+}
+
+bool AEnemy::IsOutsideAttackRadius()
+{
+	return !InTargetRange(CombatTarget, AttackRadius);
+}
+
+bool AEnemy::IsInAttackRadius()
+{
+	return InTargetRange(CombatTarget, AttackRadius);
+}
+
+bool AEnemy::IsChasing()
+{
+	return EnemyState == EEnemyState::EES_Chasing;
+}
+
+bool AEnemy::IsAttacking()
+{
+	return EnemyState == EEnemyState::EES_Attacking;
+}
+
+bool AEnemy::IsDead()
+{
+	return EnemyState == EEnemyState::EES_Dead;
+}
+
+bool AEnemy::IsEngaged()
+{
+	return EnemyState == EEnemyState::EES_Engaged;
+}
+
+void AEnemy::ClearPatrolTimer()
+{
+	GetWorldTimerManager().ClearTimer(PatrolTimer);	// 추격을 시작하기 때문에 타이머 초기화
+}
+
+void AEnemy::PatrolTimerFinished()
+{
+	MoveToTarget(PatrolTarget);
 }
 
 void AEnemy::CheckPatrolTarget()
@@ -200,7 +298,7 @@ void AEnemy::CheckPatrolTarget()
 	if (InTargetRange(PatrolTarget, PatrolRadius))
 	{
 		PatrolTarget = ChoosePatrolTarget();
-		const float WaitTime = FMath::RandRange(WaitMin, WaitMax);
+		const float WaitTime = FMath::RandRange(PatrolWaitMin, PatrolWaitMax);
 		// 타이머를 지정함, 매개변수로 타이머 변수, 함수가 있는 객체, 타이머가 다 되었을 때 실행될 함수, 시간을 받음
 		GetWorldTimerManager().SetTimer(PatrolTimer, this, &AEnemy::PatrolTimerFinished, WaitTime);
 	}
@@ -208,158 +306,77 @@ void AEnemy::CheckPatrolTarget()
 
 void AEnemy::CheckCombatTarget()
 {
-	if (!InTargetRange(CombatTarget, CombatRadius))
+	// 바깥에 ClearAttackTimer를 꺼내두지 않는 이유는 틱 중에서 밑 조건들을 전부 실패하는 경우가 있을 텐데 
+	// 그때도 ClearAttackTimer를 남발해서 성능에 영향이 가지 않게 하기 위해서임
+	if (IsOutsideCombatRadius())
 	{
+		// 공격 타이머 초기화
+		ClearAttackTimer();
 		// 추적 범위 밖으로 나가면 어그로가 풀리도록 설정
-		CombatTarget = nullptr;
-		if (HealthBarWidget)
+		LoseInterest();
+		// 순찰 시작
+		if (!IsEngaged())
 		{
-			HealthBarWidget->SetVisibility(false);
+			StartPatrolling();
 		}
-
-		EnemyState = EEnemyState::EES_Patrolling;
-		GetCharacterMovement()->MaxWalkSpeed = 125.f;
-		MoveToTarget(PatrolTarget);
-		UE_LOG(LogTemp, Warning, TEXT("Lost Interest"));
 	}
 
-	else if (!InTargetRange(CombatTarget, AttackRadius) && EnemyState != EEnemyState::EES_Chasing)
+	else if (IsOutsideAttackRadius() && !IsChasing())
 	{
+		// 공격 타이머 초기화
+		ClearAttackTimer();
 		// 공격 범위 밖이면 주인공을 추적함
-		EnemyState = EEnemyState::EES_Chasing;
-		GetCharacterMovement()->MaxWalkSpeed = 300.f;
-		MoveToTarget(CombatTarget);
-		UE_LOG(LogTemp, Warning, TEXT("Chase Player"));
+		if (!IsEngaged()) 
+		{
+			ChaseTarget();
+		}
 	}
 
-	else if (InTargetRange(CombatTarget, AttackRadius) && EnemyState != EEnemyState::EES_Attacking)
+	else if (CanAttack())
 	{
-		// 공격 범위 안이면 주인공을 공격함
-		EnemyState = EEnemyState::EES_Attacking;
-		// TODO: 공격 몽타주 삽입
-		UE_LOG(LogTemp, Warning, TEXT("Attack Player"));
+		StartAttackTimer();
 	}
 }
 
-// Called to bind functionality to input
-void AEnemy::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void AEnemy::SpawnDefaultWeapon()
 {
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
+	UWorld* World = GetWorld();
+	if (World && WeaponClass)
+	{
+		AWeapon* DefaultWeapon = World->SpawnActor<AWeapon>(WeaponClass);
+		DefaultWeapon->Equip(GetMesh(), FName(TEXT("RightHandSocket")), this, this);
+		EquippedWeapon = DefaultWeapon;
+	}
 }
 
-void AEnemy::GetHit_Implementation(const FVector& ImpactPoint)
+void AEnemy::InitializeEnemy()
 {
+	EnemyController = Cast<AAIController>(GetController());
+	MoveToTarget(PatrolTarget);
+
 	if (HealthBarWidget)
 	{
-		HealthBarWidget->SetVisibility(true);
+		HealthBarWidget->SetHealthPercent(Attributes->GetHealthPercent());
 	}
 
-	if (Attributes && Attributes->IsAlive())
-	{
-		DirectionalHitReact(ImpactPoint);
-	}
-	else
-	{
-		Die();
-	}
-
-	// 타격 사운드 재생
-	if (HitSound)
-	{
-		UGameplayStatics::PlaySoundAtLocation(	// 타격 지점에서 사운드 플레이
-			this,
-			HitSound,
-			ImpactPoint
-		);
-	}
-
-	// 타격 파티클 생성
-	if (HitParticles && GetWorld())
-	{
-		UGameplayStatics::SpawnEmitterAtLocation(	// 타격 지점에서 파티클 생성
-			GetWorld(),
-			HitParticles,
-			ImpactPoint
-		);
-	}
+	HideHealthBar();
+	SpawnDefaultWeapon();
 }
 
-void AEnemy::DirectionalHitReact(const FVector& ImpactPoint)
+void AEnemy::PawnSeen(APawn* SeenPawn)
 {
-	const FVector Forward = GetActorForwardVector();
-	const FVector ImpactLowered(ImpactPoint.X, ImpactPoint.Y, GetActorLocation().Z);
-	const FVector ToHit = (ImpactLowered - GetActorLocation()).GetSafeNormal();
+	const bool bShouldChaseTarget =
+		!IsChasing() &&
+		!IsDead() &&
+		EnemyState < EEnemyState::EES_Attacking &&
+		SeenPawn->ActorHasTag(FName(TEXT("EngageableTarget")));
 
-	// 전방벡터 * 타격 벡터 = 전방 벡터 길이 * 타격 벡터 길이 * 끼인 각 코사인
-	const double CosTheta = FVector::DotProduct(Forward, ToHit);
-	// 코사인 역함수(아크코사인)으로 각도 구하기
-	double Theta = FMath::Acos(CosTheta);
-	// 라디안을 일반 각도로 변환
-	Theta = FMath::RadiansToDegrees(Theta);
-
-	// 외적이 아래를 가리킨다면, 세타값은 음수가 되어야 한다
-	const FVector CrossProduct = FVector::CrossProduct(Forward, ToHit);
-	if (CrossProduct.Z < 0.f)
+	if (bShouldChaseTarget)
 	{
-		Theta *= -1.f;
+		CombatTarget = SeenPawn;
+		ClearPatrolTimer();
+		ChaseTarget();
 	}
-
-	FName Section(TEXT("FromBack"));
-
-	if (Theta >= -45.f && Theta < 45.f)
-	{
-		Section = FName(TEXT("FromFront"));
-	}
-	else if (Theta >= -135.f && Theta < -45.f)
-	{
-		Section = FName(TEXT("FromLeft"));
-	}
-	else if (Theta >= 45.f && Theta < 135.f)
-	{
-		Section = FName(TEXT("FromRight"));
-	}
-
-	PlayHitReactMontage(Section);
-
-	//// 테스트; 맞은 각도를 화면에 디버그 메세지로 출력할 것임
-	//if (GEngine)
-	//{
-	//	FString Message = FString::Printf(TEXT("Theta: %f"), Theta);
-	//	GEngine->AddOnScreenDebugMessage(3, 5.f, FColor::Green, Message);
-	//}
-
-	//// 디버그 화살표 그리기
-	//// 적의 포워드 벡터
-	//UKismetSystemLibrary::DrawDebugArrow(this, GetActorLocation(), GetActorLocation() + Forward * 120.f, 5.f, FColor::Red, 5.f);
-	//// 타격 벡터
-	//UKismetSystemLibrary::DrawDebugArrow(this, GetActorLocation(), GetActorLocation() + ToHit * 120.f, 5.f, FColor::Blue, 5.f);
-	//// 외적 법선 벡터
-	//UKismetSystemLibrary::DrawDebugArrow(this, GetActorLocation(), GetActorLocation() + CrossProduct * 120.f, 5.f, FColor::Green, 5.f);
-}
-
-float AEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
-{
-	if (Attributes)
-	{
-		Attributes->ReceiveDamage(DamageAmount);
-
-		if (HealthBarWidget)
-		{
-			HealthBarWidget->SetHealthPercent(Attributes->GetHealthPercent());
-		}
-	}
-
-	CombatTarget = EventInstigator->GetPawn();
-	EnemyState = EEnemyState::EES_Chasing;
-	GetCharacterMovement()->MaxWalkSpeed = 300.f;
-	MoveToTarget(CombatTarget);
-	return DamageAmount;
-}
-
-void AEnemy::PatrolTimerFinished()
-{
-	MoveToTarget(PatrolTarget);
 }
 
 // AActor::TakeDamage

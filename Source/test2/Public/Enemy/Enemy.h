@@ -4,20 +4,17 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Interfaces/HitInterface.h"
 #include "Characters/CharacterTypes.h"
+#include "Characters/BaseCharacter.h"
 #include "Enemy.generated.h"
 
-class UAnimMontage;
-class USoundBase;
-class UParticleSystem;
-class UAttributeComponent;
 class UHealthBarComponent;
 class UPawnSensingComponent;
 class AAIController;
+class AWeapon;
 
 UCLASS()
-class TEST2_API AEnemy : public ACharacter, public IHitInterface
+class TEST2_API AEnemy : public ABaseCharacter
 {
 	GENERATED_BODY()
 
@@ -25,42 +22,39 @@ public:
 	// Sets default values for this character's properties
 	AEnemy();
 
+	// Actor
+	virtual void Tick(float DeltaTime) override;
+	virtual void Destroyed() override;
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+	// ~Actor
+
+	// HitInterface
+	virtual void GetHit_Implementation(const FVector& ImpactPoint) override;
+	// HitInterface
+
 protected:
-	// Called when the game starts or when spawned
+	// Actor
 	virtual void BeginPlay() override;
+	// ~Actor
 
-	void PlayHitReactMontage(const FName& SectionName);
-
-	void Die();
+	// BaseCharacter
+	virtual void Die() override;
+	virtual void Attack() override;
+	virtual bool CanAttack() override;
+	virtual void HandleDamage(float DamageAmount) override;
+	virtual int32 PlayDeathMontage() override;
+	virtual void AttackEnd() override;
+	// ~BaseCharacter
 
 	bool InTargetRange(AActor* Target, double Radius);
-
 	void MoveToTarget(AActor* Target);
-
 	AActor* ChoosePatrolTarget();
 
-	UFUNCTION()
-	void PawnSeen(APawn* SeenPawn);
+	UPROPERTY(BlueprintReadOnly)
+	TEnumAsByte<EDeathPose> DeathPose;
 
 	UPROPERTY(BlueprintReadOnly)
-	EDeathPose DeathPose = EDeathPose::EDP_Alive;
-
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-	void CheckPatrolTarget();
-
-	void CheckCombatTarget();
-
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-	virtual void GetHit_Implementation(const FVector& ImpactPoint) override;
-
-	void DirectionalHitReact(const FVector& ImpactPoint);
-
-	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+	EEnemyState EnemyState;
 
 private:
 	/*
@@ -68,25 +62,17 @@ private:
 	*/
 
 	UPROPERTY(VisibleAnywhere)
-	UAttributeComponent* Attributes;
-
-	UPROPERTY(VisibleAnywhere)
 	UHealthBarComponent* HealthBarWidget;
 
 	UPROPERTY(VisibleAnywhere)
 	UPawnSensingComponent* PawnSensing;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Montage")
-	UAnimMontage* HitReactMontage;
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<AWeapon> WeaponClass;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Montage")
-	UAnimMontage* DeathMontage;
-
-	UPROPERTY(EditAnywhere, Category = "Sounds")
-	USoundBase* HitSound;
-
-	UPROPERTY(EditAnywhere, Category = "Visual Effects")
-	UParticleSystem* HitParticles;
+	/*
+	*	전투
+	*/
 
 	UPROPERTY()
 	AActor* CombatTarget;
@@ -96,6 +82,30 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	float AttackRadius;
+
+	void StartAttackTimer();
+	void ClearAttackTimer();
+
+	FTimerHandle AttackTimer;
+
+	UPROPERTY(EditAnywhere, Category = "Combat")
+	float AttackMin = 0.5f;
+
+	UPROPERTY(EditAnywhere, Category = "Combat")
+	float AttackMax = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "Combat")
+	float PatrollingSpeed;
+
+	UPROPERTY(EditAnywhere, Category = "Combat")
+	float ChasingSpeed;
+
+	UPROPERTY(EditAnywhere, Category = "Combat")
+	float DeathLifeSpan = 8.f;
+
+	/*
+	*	AI 네비게이션
+	*/
 
 	UPROPERTY()
 	AAIController* EnemyController;
@@ -114,12 +124,30 @@ private:
 	FTimerHandle PatrolTimer;
 
 	UPROPERTY(EditAnywhere, Category = "AI Navigation")
-	float WaitMin = 5.f;
+	float PatrolWaitMin = 5.f;							// Ctrl + R -> Ctrl + R 누르면 솔루션 내에 있는 해당 이름의 변수명을 한 번에 다 바꿀 수 있음
 
 	UPROPERTY(EditAnywhere, Category = "AI Navigation")
-	float WaitMax = 10.f;
+	float PatrolWaitMax = 10.f;
 
-	EEnemyState EnemyState;
-
+	void HideHealthBar();
+	void ShowHealthBar();
+	void LoseInterest();
+	void StartPatrolling();
+	void ChaseTarget();
+	bool IsOutsideCombatRadius();
+	bool IsOutsideAttackRadius();
+	bool IsInAttackRadius();
+	bool IsChasing();
+	bool IsAttacking();
+	bool IsDead();
+	bool IsEngaged();
+	void ClearPatrolTimer();
 	void PatrolTimerFinished();
+	void CheckPatrolTarget();
+	void CheckCombatTarget();
+	void SpawnDefaultWeapon();
+	void InitializeEnemy();
+
+	UFUNCTION()
+	void PawnSeen(APawn* SeenPawn);		// 폰 감지 컴포넌트의 OnPawnSeen(폰을 감지했을 때) 이벤트를 위한 콜백 함수
 };
