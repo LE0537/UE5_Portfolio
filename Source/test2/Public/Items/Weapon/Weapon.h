@@ -21,20 +21,32 @@ class TEST2_API AWeapon : public AItem
 public:
 	AWeapon();
 	void Equip(USceneComponent* InParent, FName InSocketName, AActor* NewOwner, APawn* NewInstigator);
+	void DeactivateEmbers();
+	void DisableSphereCollision();
+	void PlayEquipSound();
 	void AttachMeshToSocket(USceneComponent* InParent, const FName& InSocketName);		// 함수 내용물이 복잡해질 때 Ctrl + . 을 누르고 "함수 추출" 기능을 사용하면 이렇게 예쁘게 빼준다
 	
 protected:
 	virtual void BeginPlay() override;
-	void OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
-	void OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex) override;
 
 	UFUNCTION()	//
 	void OnBoxOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	bool ActorIsSameType(AActor* OtherActor);
+
+	void ExecuteGetHit(FHitResult& BoxHit);
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void CreateFields(const FVector& FieldLocation);
 
 private:
+	void BoxTrace(FHitResult& BoxHit);
+
+	bool bShowBoxDebug;
+
+	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+	FVector BoxTraceExtent;
+
 	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
 	USoundBase* EquipSound;		// 무기를 뽑거나 집어넣을 때 낼 사운드
 

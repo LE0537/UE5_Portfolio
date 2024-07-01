@@ -30,6 +30,8 @@ AItem::AItem() : Amplitude(0.25f), TimeConstant(5.f), RunningTime(0.f), ItemStat
 	PrimaryActorTick.bCanEverTick = true;
 
 	ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMeshComponent"));	// 디폴트 하위객체 생성 팩토리 함수
+	ItemMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	RootComponent = ItemMesh;
 
 	Sphere = CreateDefaultSubobject<USphereComponent>(TEXT("Sphere"));
@@ -111,12 +113,12 @@ void AItem::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 		SlashCharacter->SetOverlappingItem(this);	// 플레이어 캐릭터가 충돌하면 플레이어에 있는 아이템 포인터가 이 아이템을 가리키도록 설정
 	}
 
-	//const FString OtherActorName = OtherActor->GetName();
+	const FString OtherActorName = OtherActor->GetName();
 
-	//if (GEngine)
-	//{
-	//	GEngine->AddOnScreenDebugMessage(1, 30.f, FColor::Red, OtherActorName);
-	//}
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(1, 30.f, FColor::Red, OtherActorName);
+	}
 }
 
 void AItem::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
