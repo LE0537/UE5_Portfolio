@@ -10,7 +10,7 @@
 #include "Interfaces/HitInterface.h"
 #include "NiagaraComponent.h"
 
-AWeapon::AWeapon()
+AWeapon::AWeapon() : bShowBoxDebug(false), BoxTraceExtent(5.f)
 {
 	WeaponBox = CreateDefaultSubobject<UBoxComponent>(TEXT("Weapon Box"));
 	WeaponBox->SetupAttachment(GetRootComponent());
@@ -34,11 +34,34 @@ void AWeapon::BeginPlay()
 
 void AWeapon::Equip(USceneComponent* InParent, FName InSocketName, AActor* NewOwner, APawn* NewInstigator)
 {
+	ItemState = EItemState::EIS_Equipped;
 	SetOwner(NewOwner);				// 대미지에서 Instigator를 정하기 위한 방법 1: 무기 객체의 주인(Owner) 설정
 	SetInstigator(NewInstigator);	// 대미지에서 Instigator를 정하기 위한 방법 2: 인스티게이터 설정
-
 	AttachMeshToSocket(InParent, InSocketName);		// 지정한 메시의 지정한 소켓에 해당 메시를 붙이는 함수
-	ItemState = EItemState::EIS_Equipped;
+	DisableSphereCollision();
+	
+	PlayEquipSound();
+	DeactivateEmbers();
+}
+
+void AWeapon::DeactivateEmbers()
+{
+	if (EmbersEffect)
+	{
+		EmbersEffect->Deactivate();
+	}
+}
+
+void AWeapon::DisableSphereCollision()
+{
+	if (Sphere)
+	{
+		Sphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);	// 장착 후 아이템의 콜리전 구체를 꺼서 콜리전 구체와 플레이어 간 상호작용이 일어나지 않도록 함
+	}
+}
+
+void AWeapon::PlayEquipSound()
+{
 	if (EquipSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(	// 지정한 위치에서 들리는 소리를 구현해서 재생하는 함수
@@ -46,16 +69,6 @@ void AWeapon::Equip(USceneComponent* InParent, FName InSocketName, AActor* NewOw
 			EquipSound,	// 재생할 사운드
 			GetActorLocation()	//재생할 위치
 		);
-	}
-
-	if (Sphere)
-	{
-		Sphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);	// 장착 후 아이템의 콜리전 구체를 꺼서 콜리전 구체와 플레이어 간 상호작용이 일어나지 않도록 함
-	}
-
-	if (EmbersEffect)
-	{
-		EmbersEffect->Deactivate();
 	}
 }
 
@@ -65,17 +78,53 @@ void AWeapon::AttachMeshToSocket(USceneComponent* InParent, const FName& InSocke
 	ItemMesh->AttachToComponent(InParent, TransformRules, InSocketName);
 }
 
-void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	Super::OnSphereOverlap(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex, bFromSweep, SweepResult);
-}
-
-void AWeapon::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	Super::OnSphereEndOverlap(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex);
-}
-
 void AWeapon::OnBoxOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (ActorIsSameType(OtherActor))
+	{
+		return;
+	}
+
+	FHitResult BoxHit;
+	BoxTrace(BoxHit);
+	if (BoxHit.GetActor())
+	{
+		if (ActorIsSameType(BoxHit.GetActor()))
+		{
+			return;
+		}
+
+		UGameplayStatics::ApplyDamage(
+			BoxHit.GetActor(),					// 대미지를 받은 액터, 이 정보를 토대로 이 액터의 TakeDamage 함수가 호출될 것
+			Damage,								// 대미지값
+			GetInstigator()->GetController(),	// 인스티게이터(대미지를 준 주체)인 플레이어의 컨트롤러
+			this,								// 대미지를 직접적으로 준 객체인 자신(무기)을 전달
+			UDamageType::StaticClass()			// 대미지 타입
+		);	// 이제 Enemy.cpp에서 TakeDamage를 처리할것임
+
+		ExecuteGetHit(BoxHit);
+
+		CreateFields(BoxHit.ImpactPoint);
+	}
+}
+
+bool AWeapon::ActorIsSameType(AActor* OtherActor)
+{
+	return GetOwner()->ActorHasTag(TEXT("Enemy")) && OtherActor->ActorHasTag(TEXT("Enemy"));
+}
+
+void AWeapon::ExecuteGetHit(FHitResult& BoxHit)
+{
+	IHitInterface* HitInterface = Cast<IHitInterface>(BoxHit.GetActor());
+
+	if (HitInterface)
+	{
+		//HitInterface->GetHit(BoxHit.ImpactPoint);	// BlueprintNativeEvent로 함수 호출법이 달라짐
+		HitInterface->Execute_GetHit(BoxHit.GetActor(), BoxHit.ImpactPoint);	// 원래 기존에 존재하던 매개변수들과 함께 해당 함수가 있는 객체를 전달해야 함
+	}
+}
+
+void AWeapon::BoxTrace(FHitResult& BoxHit)
 {
 	const FVector Start = BoxTraceStart->GetComponentLocation();	// BoxTraceStart의 위치를 가져오는 함수
 	const FVector End = BoxTraceEnd->GetComponentLocation();		// BoxTraceEnd의 위치를 가저오는 함수
@@ -90,42 +139,19 @@ void AWeapon::OnBoxOverlap(UPrimitiveComponent* OverlappedComponent, AActor* Oth
 	ActorsToIgnore.Add(this);	// 무기 자신
 	ActorsToIgnore.Add(GetOwner());	// 플레이어
 
-	FHitResult BoxHit;
-
 	UKismetSystemLibrary::BoxTraceSingle(
 		this,	// 월드 컨텍스트 오브젝트
 		Start,	// 시작 지점
 		End,	// 끝 지점
-		FVector(5.f, 5.f, 5.f),					// 트레이스에 사용할 박스의 크기
+		BoxTraceExtent,					// 트레이스에 사용할 박스의 크기
 		BoxTraceStart->GetComponentRotation(),	// 트레이스에 사용할 박스의 회전값
 		ETraceTypeQuery::TraceTypeQuery1,		// 트레이스에서 확인할 채널
 		false,									// bTraceComplex: 간단한 충돌이 아닌 실제 메시와 충돌검사를 할 것인지 설정하는 매개변수
 		ActorsToIgnore,							// 무시할 액터들을 담아놓은 동적 배열 전달
-		EDrawDebugTrace::None,					// 충돌이 검출되었을 때 디버그 드로우를 어떻게 할지 결정
+		bShowBoxDebug ? EDrawDebugTrace::ForDuration : EDrawDebugTrace::None,					// 충돌이 검출되었을 때 디버그 드로우를 어떻게 할지 결정
 		BoxHit,									// 검출된 충돌에 대한 정보를 내보내는 출력용 매개변수
 		true									// 충돌을 검출할 때 자기 자신을 생략할지 정하는 변수
 	);
 
-	if (BoxHit.GetActor())
-	{
-		UGameplayStatics::ApplyDamage(
-			BoxHit.GetActor(),					// 대미지를 받은 액터, 이 정보를 토대로 이 액터의 TakeDamage 함수가 호출될 것
-			Damage,								// 대미지값
-			GetInstigator()->GetController(),	// 인스티게이터(대미지를 준 주체)인 플레이어의 컨트롤러
-			this,								// 대미지를 직접적으로 준 객체인 자신(무기)을 전달
-			UDamageType::StaticClass()			// 대미지 타입
-		);	// 이제 Enemy.cpp에서 TakeDamage를 처리할것임
-
-		IHitInterface* HitInterface = Cast<IHitInterface>(BoxHit.GetActor());
-
-		if (HitInterface)
-		{
-			//HitInterface->GetHit(BoxHit.ImpactPoint);	// BlueprintNativeEvent로 함수 호출법이 달라짐
-			HitInterface->Execute_GetHit(BoxHit.GetActor(), BoxHit.ImpactPoint);	// 원래 기존에 존재하던 매개변수들과 함께 해당 함수가 있는 객체를 전달해야 함
-		}
-
-		IgnoreActors.AddUnique(BoxHit.GetActor());	// 타격 판정을 한 번만 넣기 위한 AddUnique(중복 삽입을 허용하지 않는 Add)
-
-		CreateFields(BoxHit.ImpactPoint);
-	}
+	IgnoreActors.AddUnique(BoxHit.GetActor());	// 타격 판정을 한 번만 넣기 위한 AddUnique(중복 삽입을 허용하지 않는 Add)
 }
